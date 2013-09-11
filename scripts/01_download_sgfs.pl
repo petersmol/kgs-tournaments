@@ -9,19 +9,8 @@ use warnings;
 use Data::Dumper;
 use FindBin;
 use lib "$FindBin::Bin/../lib";
+use Tournaments::Controller::Root;
 
-use Tournaments::Model::DB;
-use Tournaments::Model::KGS;
+my $days_shift=$ARGV[0]; # Скачивать партии не текущего месяца, а предыдущего
 
-my $players = Tournaments::Model::DB->getTournamentPlayers;
-
-# Set timeshift in days to download prevous month games
-my $days_shift=$ARGV[0];
-
-foreach my $name (keys %$players){
-    my $res = Tournaments::Model::KGS->downloadArchive($name, $days_shift);
-
-    print "$name ".$res->{code}." ".$res->{url}."\n";
-    die Dumper ($res) if ($res->{code} eq 'error');
-    sleep 10;
-}
+Tournaments::Controller::Root->download_all($days_shift);
