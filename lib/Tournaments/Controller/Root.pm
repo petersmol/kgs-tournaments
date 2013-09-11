@@ -51,4 +51,40 @@ sub parse_all {
     }
 }
 
+
+# Обсчитывает турнирную таблицу по необработанным партиям
+sub process_tournament {
+    my ($self, $tag)=@_;
+
+    # Получаем информацию об игроках
+    my $players = Tournaments::Model::DB->getTournamentPlayers;
+
+    # Получаем список новых партий
+    my $res = Tournaments::Model::DB->enumerateNewGames($tag);
+
+    foreach my $game (@$res){
+        my $winner=$players->{$game->{winner}};
+        my $loser=$players->{$game->{loser}};
+        # Пересчитываем очки победителя
+        $winner->{points}+=2 + 0.1*($winner->{init_place}-$loser->{init_place});
+        $winner->{games_cnt}++;
+        $winner->{lastupdate}=\'NOW()';
+
+        # Пересчитываем очки проигравшего
+        $loser->{points}+=1;
+        $loser->{games_cnt}++;
+        $loser->{lastupdate}=\'NOW()';
+
+        # Записываем информацию о турнирной партии
+        Tournaments::Model::DB->insertTournamentGame($winner, $loser, $game);
+
+        # Помечаем sgf как обработанную
+        Tournaments::Model::DB->updateGameStatus($game, 'tournament_game');
+
+        print Dumper $game;
+    }
+
+    # Сохраняем новые очки игроков
+    Tournaments::Model::DB->updatePlayers($players);
+}
 1;
