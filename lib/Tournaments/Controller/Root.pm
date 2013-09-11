@@ -29,4 +29,26 @@ sub download_all {
     }
 }
 
+# Парсит скаченные SGF и сохраняет результат в базе
+sub parse_all {
+
+    # Получаем список имеющихся SGF-файлов
+    my $files = Tournaments::Model::KGS->filelist;
+
+    # Получаем список партий из базы
+    my $games = Tournaments::Model::DB->enumerateGames;
+
+
+    # Добавляем недостающие файлы в базу данных
+    foreach my $file (@$files){
+        next if ($games->{$file}); # Пропускаем игры, уже добавленные в базу
+        
+        # Парсим файл 
+        my $info=Tournaments::Model::KGS->parse($file);
+        print "$file\n".Dumper($info);
+
+        Tournaments::Model::DB->createGame($info);
+    }
+}
+
 1;
