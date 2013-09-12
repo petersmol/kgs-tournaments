@@ -118,5 +118,12 @@ sub insertTournamentGame {
     $sth->execute($winner->{id}, $loser->{id}, $game->{id});
 }
 
+sub enumerateRepeatedGames {
+    my ($self, $winner_id, $loser_id)=@_;
+
+    my $rows=$dbh->selectall_arrayref("SELECT * FROM tournamentGames WHERE (winner='$winner_id' AND loser='$loser_id' ) OR
+                                                                           (winner='$loser_id'  AND loser='$winner_id')", AS_HASH);
+    
+}
 
 1;

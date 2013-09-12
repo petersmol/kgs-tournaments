@@ -65,6 +65,13 @@ sub process_tournament {
     foreach my $game (@$res){
         my $winner=$players->{$game->{winner}};
         my $loser=$players->{$game->{loser}};
+
+        # Пропускаем игроков из разных групп
+        next if ($winner->{groupid}!=$loser->{groupid});
+
+        # Пропускаем повторно сыгранные партии
+        next if (@{Tournaments::Model::DB->enumerateRepeatedGames($winner->{id}, $loser->{id})}>0);
+
         # Пересчитываем очки победителя
         $winner->{points}+=2 + 0.1*($winner->{init_place}-$loser->{init_place});
         $winner->{games_cnt}++;
