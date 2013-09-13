@@ -18,7 +18,7 @@ use Tournaments::Model::DB;
 sub download_all {
     my ($self, $days_shift)=@_; # Set timeshift in days to download prevous month games
 
-    my $players = Tournaments::Model::DB->getTournamentPlayers;
+    my $players = Tournaments::Model::DB->getTournamentPlayersByNick;
 
     foreach my $name (keys %$players){
         my $res = Tournaments::Model::KGS->downloadArchive($name, $days_shift);
@@ -57,7 +57,7 @@ sub process_tournament {
     my ($self, $tag)=@_;
 
     # Получаем информацию об игроках
-    my $players = Tournaments::Model::DB->getTournamentPlayers;
+    my $players = Tournaments::Model::DB->getTournamentPlayersByNick;
 
     # Получаем список новых партий
     my $res = Tournaments::Model::DB->enumerateNewGames($tag);
@@ -73,11 +73,22 @@ sub process_tournament {
         next if (@{Tournaments::Model::DB->enumerateRepeatedGames($winner->{id}, $loser->{id})}>0);
 
         # Пересчитываем очки победителя
-        $winner->{points}+=2 + 0.1*($winner->{init_place}-$loser->{init_place});
+=tournament_9may2013
+        # в зависимости от разницы начальных мест
+        $winner->{points}+=2 + 0.1*($winner->{init_place}-$loser->{init_place}); 
+=cut
+
+        # Победитель получает 2 очка + плюшку если соперник сильнее (0.1 за каждые 100 очков разницы)
+        $winner->{points}+=2;
+#        if ($winner->{rating}<$loser->{rating}){
+#            $winner->{points} += 0.1*int( ($loser->{rating}-$winner->{rating})/100 );
+#        }
+
         $winner->{games_cnt}++;
         $winner->{lastupdate}=\'NOW()';
 
         # Пересчитываем очки проигравшего
+        # Проигравший получает 1 очко
         $loser->{points}+=1;
         $loser->{games_cnt}++;
         $loser->{lastupdate}=\'NOW()';
@@ -92,6 +103,47 @@ sub process_tournament {
     }
 
     # Сохраняем новые очки игроков
+    Tournaments::Model::DB->updatePlayers($players);
+}
+
+
+sub update_coefficients {
+    my ($self)=@_;
+    my $players = Tournaments::Model::DB->getTournamentPlayers;
+
+    # Делаем из массива хэш для удобства поиска по id
+    my $PLAYERS;
+    foreach my $p (@$players){
+        $PLAYERS->{$p->{id}}=$p;
+    }
+
+    # Пересчитываем коэффициенты
+    foreach my $p (@$players){
+        my $games=Tournaments::Model::DB->enumeratePlayerGames($p->{id});
+
+        my ($berger)=(0);
+        foreach my $g (@$games){
+            if ($g->{winner}==$p->{id}){
+                $berger+=$PLAYERS->{$g->{loser}}{points};
+            }
+        }
+        $p->{k1}=$berger;
+    }
+
+    # Пересчитываем места в группах
+    $players= [ sort { $a->{groupid}<=>$b->{groupid} or $b->{points} <=> $a->{points} or $b->{k1} <=> $a->{k1} } @$players ];
+
+    
+    my ($groupid, $place)=(0,0);
+    foreach my $p (@$players){
+        if ($p->{groupid}!=$groupid){
+            $groupid=$p->{groupid};
+            $place=1;
+        }
+        $p->{place}=$place;
+        $place++;
+    }
+
     Tournaments::Model::DB->updatePlayers($players);
 }
 1;

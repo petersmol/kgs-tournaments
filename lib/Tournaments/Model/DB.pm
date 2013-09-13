@@ -24,9 +24,17 @@ BEGIN {
 ################################
 #######     Players     ########
 ################################
+sub getTournamentPlayersByNick {
+    my ($self)=@_; 
+    
+    my $rows=$dbh->selectall_hashref("SELECT * FROM tournamentPlayers WHERE active=1", 'kgs');
+    return $rows;
+}
+
 sub getTournamentPlayers {
     my ($self)=@_; 
-    my $rows=$dbh->selectall_hashref("SELECT * FROM tournamentPlayers WHERE active=1", 'kgs');
+    
+    my $rows=$dbh->selectall_arrayref("SELECT * FROM tournamentPlayers WHERE active=1", AS_HASH);
     return $rows;
 }
 
@@ -68,9 +76,16 @@ sub importPlayers {
 sub updatePlayers {
     my ($self, $players)=@_; 
 
-    my $sth=$dbh->prepare("UPDATE tournamentPlayers SET points=?, games_cnt=?, lastupdate=? WHERE kgs=? AND active=1");
-    foreach my $name (keys %$players){
-        $sth->execute($players->{$name}{points}, $players->{$name}{games_cnt}, $players->{$name}{lastupdate}, $name);
+    my $sth=$dbh->prepare("UPDATE tournamentPlayers SET place=?, points=?, k1=?, games_cnt=?, lastupdate=? WHERE kgs=? AND active=1");
+
+    if (ref $players eq 'HASH'){
+        foreach my $name (keys %$players){
+            $sth->execute($players->{$name}{place}, $players->{$name}{points}, $players->{$name}{k1}, $players->{$name}{games_cnt}, $players->{$name}{lastupdate}, $name);
+        }
+    }else{
+        foreach my $p (@$players){
+            $sth->execute($p->{place}, $p->{points}, $p->{k1}, $p->{games_cnt}, $p->{lastupdate}, $p->{kgs});
+        }
     }
 
 }
@@ -118,12 +133,17 @@ sub insertTournamentGame {
     $sth->execute($winner->{id}, $loser->{id}, $game->{id});
 }
 
+sub enumeratePlayerGames {
+    my ($self, $id)=@_;
+    $dbh->selectall_arrayref("SELECT * FROM tournamentGames WHERE winner='$id' OR loser='$id'", AS_HASH);
+}
+
+
 sub enumerateRepeatedGames {
     my ($self, $winner_id, $loser_id)=@_;
 
-    my $rows=$dbh->selectall_arrayref("SELECT * FROM tournamentGames WHERE (winner='$winner_id' AND loser='$loser_id' ) OR
+    $dbh->selectall_arrayref("SELECT * FROM tournamentGames WHERE (winner='$winner_id' AND loser='$loser_id' ) OR
                                                                            (winner='$loser_id'  AND loser='$winner_id')", AS_HASH);
-    
 }
 
 1;
