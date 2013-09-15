@@ -98,7 +98,7 @@ sub parse
     my $info= {
         sgf     => $file,
         date    => $sgf->date,
-        komi    => $sgf->komi,
+        komi    => 0+$sgf->komi,
         tag     => '',
     };
 
@@ -111,7 +111,10 @@ sub parse
             $info->{winner} = $sgf->white;
             $info->{loser}  = $sgf->black;
         }
-        $info->{win_by}=$2;
+        $info->{win_by}=0+$2;
+
+        $info->{win_by}=$2 unless ($info->{win_by});
+        
     }
 
     # Проверяем, удовлетворяет ли партия всем условиям добавления в базу
@@ -122,6 +125,10 @@ sub parse
         $status='Bad komi: '.$sgf->komi;
     }elsif($sgf->size != 19){
         $status='Bad board size: '.$sgf->size;
+    }elsif($sgf->TM != 3600){
+        $status='Bad main time: '.($sgf->TM/60);
+    }elsif($sgf->OT ne '3x30 byo-yomi'){
+        $status='Bad additional time: '.$sgf->OT;
     }
 
     if ($file =~ /([a-z0-9]+)-([a-z0-9]+)(-[0-9]+)?\.sgf$/i){
@@ -133,10 +140,8 @@ sub parse
     }
 
     # Ищем теги
-    if ($status eq 'ok'){
-        foreach (@TAGS){
-            $info->{tag}=$_ if ($sgf->getsgf =~ /$_/i);
-        }
+    foreach (@TAGS){
+        $info->{tag}=$_ if ($sgf->getsgf =~ /$_/i);
     }
 
     $info->{status}=$status;

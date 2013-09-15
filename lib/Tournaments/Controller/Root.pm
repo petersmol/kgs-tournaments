@@ -95,6 +95,7 @@ sub process_tournament {
 
         # Записываем информацию о турнирной партии
         Tournaments::Model::DB->insertTournamentGame($winner, $loser, $game);
+        Tournaments::Model::DB->writeLog($winner->{kgs}, "выиграл у $loser->{kgs} ($game->{win_by})", $game->{id});
 
         # Помечаем sgf как обработанную
         Tournaments::Model::DB->updateGameStatus($game, 'tournament_game');

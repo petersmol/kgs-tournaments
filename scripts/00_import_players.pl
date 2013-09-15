@@ -15,5 +15,6 @@ my $tournament='9may2013';
 my $tag='Бойцы Вейцы 2013';
 
 Tournaments::Model::DB->clearPlayers($tournament);
-Tournaments::Model::DB->clearGames($tag);
+Tournaments::Model::DB->refreshGames($tag);
+Tournaments::Model::DB->clearLog;
 Tournaments::Model::DB->importPlayers($tournament);

@@ -27,7 +27,7 @@ BEGIN {
 sub getTournamentPlayersByNick {
     my ($self)=@_; 
     
-    my $rows=$dbh->selectall_hashref("SELECT * FROM tournamentPlayers WHERE active=1", 'kgs');
+    my $rows=$dbh->selectall_hashref("SELECT * FROM tournamentPlayers WHERE active=1 ORDER BY kgs", 'kgs');
     return $rows;
 }
 
@@ -117,9 +117,16 @@ sub updateGameStatus {
     $dbh->do("UPDATE KGS_games SET status='$status' WHERE id='$game->{id}'");
 }
 
-sub clearGames {
+# To recount tournament points
+sub refreshGames {
     my ($self, $tag)=@_; 
     $dbh->do("UPDATE KGS_games SET status='ok' WHERE status='tournament_game' AND tag='$tag'");
+}
+
+# To parse it again
+sub clearGames {
+    my ($self, $tag)=@_; 
+    $dbh->do("DELETE FROM KGS_games;");
 }
 
 ################################
@@ -144,6 +151,23 @@ sub enumerateRepeatedGames {
 
     $dbh->selectall_arrayref("SELECT * FROM tournamentGames WHERE (winner='$winner_id' AND loser='$loser_id' ) OR
                                                                            (winner='$loser_id'  AND loser='$winner_id')", AS_HASH);
+}
+
+
+
+################################
+###     Tournament  Log     ####
+################################
+
+# Delete all log entries (For test purposes)
+sub clearLog {
+    my ($self, $tournament)=@_; 
+    $dbh->do("DELETE FROM tournamentLog");
+}
+
+sub writeLog {
+    my ($self, $name, $descr, $game_id)=@_; 
+    $dbh->do("INSERT INTO tournamentLog (name, descr, game_id) VALUES ('$name', '$descr', '$game_id')");
 }
 
 1;

@@ -14,3 +14,5 @@ use Tournaments::Controller::Root;
 my $tag='Бойцы Вейцы 2013';
 
 Tournaments::Controller::Root->process_tournament($tag);
+Tournaments::Controller::Root->update_coefficients;
+

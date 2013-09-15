@@ -1,3 +1,4 @@
 lib/Tournaments/Config.pm
 cache/
 sgf/
+cron.log
