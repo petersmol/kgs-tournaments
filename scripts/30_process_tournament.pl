@@ -10,9 +10,10 @@ use Data::Dumper;
 use FindBin;
 use lib "$FindBin::Bin/../lib";
 use Tournaments::Controller::Root;
+use Tournaments::Config;
 
-my $tag='Бойцы Вейцы 2013';
+my $tags=CNF('game.tags');
 
-Tournaments::Controller::Root->process_tournament($tag);
+Tournaments::Controller::Root->process_tournament($tags);
 Tournaments::Controller::Root->update_coefficients;
 

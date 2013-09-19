@@ -54,17 +54,21 @@ sub parse_all {
 
 # Обсчитывает турнирную таблицу по необработанным партиям
 sub process_tournament {
-    my ($self, $tag)=@_;
+    my ($self, $tags)=@_;
 
     # Получаем информацию об игроках
     my $players = Tournaments::Model::DB->getTournamentPlayersByNick;
 
     # Получаем список новых партий
-    my $res = Tournaments::Model::DB->enumerateNewGames($tag);
+    my $res = Tournaments::Model::DB->enumerateNewGames($tags);
 
     foreach my $game (@$res){
         my $winner=$players->{$game->{winner}};
         my $loser=$players->{$game->{loser}};
+
+        # Пропускаем партии неизвестных игроков 
+        next if (!$winner or !$loser);
+        
 
         # Пропускаем игроков из разных групп
         next if ($winner->{groupid}!=$loser->{groupid});
@@ -72,22 +76,14 @@ sub process_tournament {
         # Пропускаем повторно сыгранные партии
         next if (@{Tournaments::Model::DB->enumerateRepeatedGames($winner->{id}, $loser->{id})}>0);
 
-        # Пересчитываем очки победителя
-=tournament_9may2013
-        # в зависимости от разницы начальных мест
-        $winner->{points}+=2 + 0.1*($winner->{init_place}-$loser->{init_place}); 
-=cut
+        # Пересчитываем очки
 
-        # Победитель получает 2 очка + плюшку если соперник сильнее (0.1 за каждые 100 очков разницы)
+        # Победитель получает 2 очка 
         $winner->{points}+=2;
-#        if ($winner->{rating}<$loser->{rating}){
-#            $winner->{points} += 0.1*int( ($loser->{rating}-$winner->{rating})/100 );
-#        }
 
         $winner->{games_cnt}++;
         $winner->{lastupdate}=\'NOW()';
 
-        # Пересчитываем очки проигравшего
         # Проигравший получает 1 очко
         $loser->{points}+=1;
         $loser->{games_cnt}++;
@@ -132,7 +128,7 @@ sub update_coefficients {
     }
 
     # Пересчитываем места в группах
-    $players= [ sort { $a->{groupid}<=>$b->{groupid} or $b->{points} <=> $a->{points} or $b->{k1} <=> $a->{k1} } @$players ];
+    $players= [ sort { $a->{groupid}<=>$b->{groupid} or $b->{points} <=> $a->{points} or $b->{k1} <=> $a->{k1} or $b->{rating} <=> $a->{rating} } @$players ];
 
     
     my ($groupid, $place)=(0,0);

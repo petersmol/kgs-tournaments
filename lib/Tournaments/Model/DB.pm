@@ -42,6 +42,8 @@ sub getTournamentPlayers {
 sub clearPlayers {
     my ($self, $tournament)=@_; 
     $dbh->do("DELETE FROM tournamentPlayers WHERE tournament='$tournament'");
+    $dbh->do("DELETE FROM tournamentChat");
+    $dbh->do("DELETE FROM tournamentAnnounce");
     $dbh->do("UPDATE tournamentPlayers SET active=0");
 }
 
@@ -50,7 +52,8 @@ sub importPlayers {
     my ($self, $tournament)=@_; 
     my $rows=$dbh->selectall_arrayref("SELECT * FROM tournamentReg WHERE tournament='$tournament'", AS_HASH );
     my $groups=4; # Group counts
-    my $players_in_group=int(@$rows/$groups +0.99);
+#    my $players_in_group=int(@$rows/$groups +0.99);
+    my $players_in_group=10;
 
     # Sort players by rating
     $rows = [ reverse sort {$a->{rating} <=> $b->{rating}} @$rows ];
@@ -100,8 +103,10 @@ sub enumerateGames {
 }
 
 sub enumerateNewGames {
-    my ($self, $tag)=@_; 
-    my $rows=$dbh->selectall_arrayref("SELECT * FROM KGS_games WHERE status='ok' AND tag='$tag' ORDER BY id", AS_HASH);
+    my ($self, $tags)=@_; 
+    my $taglist=join "', '", @$tags;
+    print "SELECT * FROM KGS_games WHERE status='ok' AND tag IN('$taglist') ORDER BY id\n";
+    my $rows=$dbh->selectall_arrayref("SELECT * FROM KGS_games WHERE status='ok' AND tag IN('$taglist') ORDER BY id", AS_HASH);
     return $rows;
 }
 
@@ -119,13 +124,14 @@ sub updateGameStatus {
 
 # To recount tournament points
 sub refreshGames {
-    my ($self, $tag)=@_; 
-    $dbh->do("UPDATE KGS_games SET status='ok' WHERE status='tournament_game' AND tag='$tag'");
+    my ($self, $tags)=@_; 
+    my $taglist=join "', '", @$tags;
+    $dbh->do("UPDATE KGS_games SET status='ok' WHERE status='tournament_game' AND tag IN('$taglist')");
 }
 
 # To parse it again
 sub clearGames {
-    my ($self, $tag)=@_; 
+    my ($self)=@_; 
     $dbh->do("DELETE FROM KGS_games;");
 }
 

@@ -12,11 +12,10 @@ use Games::Go::SGF;
 use POSIX qw(strftime);
 use FindBin;
 use lib "$FindBin::Bin/../lib";
+use Tournaments::Config qw(CNF);
 
 my $cache_dir  = "$FindBin::Bin/../cache";
 my $sgf_dir  = "$FindBin::Bin/../sgf";
-
-my @TAGS=('Бойцы Вейцы 2013');
 
 sub formatUrl
 {
@@ -121,13 +120,13 @@ sub parse
     my $status='ok';
     if ($sgf->HA){
         $status='Handicap game: '.$sgf->HA;
-    }elsif($sgf->komi != 6.5){
+    }elsif($sgf->komi != CNF('game.komi')){
         $status='Bad komi: '.$sgf->komi;
-    }elsif($sgf->size != 19){
+    }elsif($sgf->size != CNF('game.board')){
         $status='Bad board size: '.$sgf->size;
-    }elsif($sgf->TM != 3600){
+    }elsif(CNF('game.main_time') and $sgf->TM != 60*CNF('game.main_time')){
         $status='Bad main time: '.($sgf->TM/60);
-    }elsif($sgf->OT ne '3x30 byo-yomi'){
+    }elsif(CNF('game.additional_time') and $sgf->OT ne CNF('game.additional_time')){
         $status='Bad additional time: '.$sgf->OT;
     }
 
@@ -140,7 +139,7 @@ sub parse
     }
 
     # Ищем теги
-    foreach (@TAGS){
+    foreach (@{CNF('game.tags')}){
         $info->{tag}=$_ if ($sgf->getsgf =~ /$_/i);
     }
 
