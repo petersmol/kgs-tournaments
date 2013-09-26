@@ -47,6 +47,7 @@ sub parse_all {
         my $info=Tournaments::Model::KGS->parse($file);
         print "$file\n".Dumper($info);
 
+        next if ($info->{status} eq 'unfinished');
         Tournaments::Model::DB->createGame($info);
     }
 }

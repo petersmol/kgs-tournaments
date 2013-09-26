@@ -113,12 +113,13 @@ sub parse
         $info->{win_by}=0+$2;
 
         $info->{win_by}=$2 unless ($info->{win_by});
-        
     }
 
     # Проверяем, удовлетворяет ли партия всем условиям добавления в базу
     my $status='ok';
-    if ($sgf->HA){
+    if (!$sgf->RE){
+        $status='unfinished';
+    }elsif ($sgf->HA){
         $status='Handicap game: '.$sgf->HA;
     }elsif($sgf->komi != CNF('game.komi')){
         $status='Bad komi: '.$sgf->komi;
@@ -128,14 +129,16 @@ sub parse
         $status='Bad main time: '.($sgf->TM/60);
     }elsif(CNF('game.additional_time') and $sgf->OT ne CNF('game.additional_time')){
         $status='Bad additional time: '.$sgf->OT;
-    }
+    } 
 
-    if ($file =~ /([a-z0-9]+)-([a-z0-9]+)(-[0-9]+)?\.sgf$/i){
-        if (($1 ne $info->{winner} and $2 ne $info->{winner}) or ($1 ne $info->{loser} and $2 ne $info->{loser})){
-            $status='wrong opponents: '.$sgf->white."-".$sgf->black;
+    if ($status ne 'unfinished'){
+        if ($file =~ /([a-z0-9]+)-([a-z0-9]+)(-[0-9]+)?\.sgf$/i){
+            if (($1 ne $info->{winner} and $2 ne $info->{winner}) or ($1 ne $info->{loser} and $2 ne $info->{loser})){
+                    $status='strange opponents in sgf (pair or demo game)';
+            }
+        }else{
+            $status='demo game';
         }
-    }else{
-        $status='demo game';
     }
 
     # Ищем теги

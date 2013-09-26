@@ -42,8 +42,8 @@ sub getTournamentPlayers {
 sub clearPlayers {
     my ($self, $tournament)=@_; 
     $dbh->do("DELETE FROM tournamentPlayers WHERE tournament='$tournament'");
-    $dbh->do("DELETE FROM tournamentChat");
-    $dbh->do("DELETE FROM tournamentAnnounce");
+#    $dbh->do("DELETE FROM tournamentChat");
+#    $dbh->do("DELETE FROM tournamentAnnounce");
     $dbh->do("UPDATE tournamentPlayers SET active=0");
 }
 
@@ -52,8 +52,8 @@ sub importPlayers {
     my ($self, $tournament)=@_; 
     my $rows=$dbh->selectall_arrayref("SELECT * FROM tournamentReg WHERE tournament='$tournament'", AS_HASH );
     my $groups=4; # Group counts
-#    my $players_in_group=int(@$rows/$groups +0.99);
-    my $players_in_group=10;
+    my $players_in_group=int(@$rows/$groups +0.99);
+#    my $players_in_group=10;
 
     # Sort players by rating
     $rows = [ reverse sort {$a->{rating} <=> $b->{rating}} @$rows ];
