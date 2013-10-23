@@ -35,6 +35,7 @@ sub parse_all {
     # Получаем список имеющихся SGF-файлов
     my $files = Tournaments::Model::KGS->filelist;
 
+
     # Получаем список партий из базы
     my $games = Tournaments::Model::DB->enumerateGames;
 
@@ -44,8 +45,9 @@ sub parse_all {
         next if ($games->{$file}); # Пропускаем игры, уже добавленные в базу
         
         # Парсим файл 
+        print "$file\n";
         my $info=Tournaments::Model::KGS->parse($file);
-        print "$file\n".Dumper($info);
+        print Dumper($info);
 
         next if ($info->{status} eq 'unfinished');
         Tournaments::Model::DB->createGame($info);
@@ -86,7 +88,7 @@ sub process_tournament {
         $winner->{lastupdate}=\'NOW()';
 
         # Проигравший получает 1 очко
-        $loser->{points}+=1;
+        $loser->{points}+=1 if ($game->{win_by} !~/Forfeit/);
         $loser->{games_cnt}++;
         $loser->{lastupdate}=\'NOW()';
 
