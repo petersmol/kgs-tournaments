@@ -49,7 +49,7 @@ sub clearPlayers {
 
 # Import players from register table 
 sub importPlayers {
-    my ($self, $tournament)=@_; 
+    my ($self, $tournament, $type)=@_; 
     my $rows=$dbh->selectall_arrayref("SELECT * FROM tournamentReg WHERE tournament='$tournament'", AS_HASH );
     my $groups=4; # Group counts
     my $players_in_group=int(@$rows/$groups +0.99);
@@ -60,18 +60,39 @@ sub importPlayers {
     
 
     my $sth=$dbh->prepare("INSERT INTO tournamentPlayers (tournament, kgs, fio, rating, groupid, init_place, points, games_cnt, lastupdate, active) 
-                                          VALUES ('$tournament', ?  , ?  , ?     , ?      , ?         , 0     , 0        , NOW()     , 1     )");
+                                          VALUES ('$tournament'      , ?  , ?  , ?  , ?      , ?            , ?     , 0        , NOW()     , 1     )");
 
 
-    my ($cur_group,$cur_place)=(1,1);
+    my ($cur_group,$cur_place, $cur_place_in_group)=(1,1,1);
+
+
+    if ($type eq 'mac-mahon'){ # В Мак-Магоне группа = число начальных очков (3, 2, 1, 0)
+        $cur_group=$groups-1;
+    }else{                     # В круговике группа - это просто порядковый номер (1, 2, 3, 4)
+        $cur_group=1;
+    }
+
     foreach my $p (@$rows){
-        $sth->execute( lc($p->{kgs}), $p->{fio}, $p->{rating}, $cur_group, $cur_place);
+        if ($type eq 'round-robin'){ # В круговике места в каждой группе свои
+            $sth->execute( lc($p->{kgs}), $p->{fio}, $p->{rating}, $cur_group, $cur_place_in_group, 0);
+        }elsif($type eq 'mac-mahon'){
+            #INSERT        ник            имя        рейтинг       группа      место                начальные очки
+            $sth->execute( lc($p->{kgs}), $p->{fio}, $p->{rating}, $cur_group, $cur_place,          $cur_group);
+        }else{
+            $sth->execute( lc($p->{kgs}), $p->{fio}, $p->{rating}, $cur_group, $cur_place,          0);
+        }
         
         # Incrementing counters
         $cur_place++;
-        if ($cur_place>$players_in_group){
-            $cur_place=1;
-            $cur_group++;
+        $cur_place_in_group++;
+        if ($cur_place_in_group>$players_in_group){
+            $cur_place_in_group=1;
+
+            if ($type eq 'mac-mahon'){
+                $cur_group--;
+            }else{
+                $cur_group++;
+            }
         }
     }
 }
@@ -79,15 +100,15 @@ sub importPlayers {
 sub updatePlayers {
     my ($self, $players)=@_; 
 
-    my $sth=$dbh->prepare("UPDATE tournamentPlayers SET place=?, points=?, k1=?, games_cnt=?, lastupdate=? WHERE kgs=? AND active=1");
+    my $sth=$dbh->prepare("UPDATE tournamentPlayers SET place=?, points=?, k1=?, k2=?, games_cnt=?, lastupdate=? WHERE kgs=? AND active=1");
 
     if (ref $players eq 'HASH'){
         foreach my $name (keys %$players){
-            $sth->execute($players->{$name}{place}, $players->{$name}{points}, $players->{$name}{k1}, $players->{$name}{games_cnt}, $players->{$name}{lastupdate}, $name);
+            $sth->execute($players->{$name}{place}, $players->{$name}{points}, $players->{$name}{k1}, $players->{$name}{k2}, $players->{$name}{games_cnt}, $players->{$name}{lastupdate}, $name);
         }
     }else{
         foreach my $p (@$players){
-            $sth->execute($p->{place}, $p->{points}, $p->{k1}, $p->{games_cnt}, $p->{lastupdate}, $p->{kgs});
+            $sth->execute($p->{place}, $p->{points}, $p->{k1}, $p->{k2}, $p->{games_cnt}, $p->{lastupdate}, $p->{kgs});
         }
     }
 

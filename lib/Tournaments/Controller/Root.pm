@@ -12,6 +12,7 @@ use FindBin;
 use lib "$FindBin::Bin/../lib";
 use Tournaments::Model::KGS;
 use Tournaments::Model::DB;
+use Tournaments::Config qw(CNF);
 
 
 # Получает список игроков турнира и скачивает все их партии
@@ -116,29 +117,53 @@ sub update_coefficients {
     foreach my $p (@$players){
         $PLAYERS->{$p->{id}}=$p;
     }
+    my $game_type=CNF('game.type'); # В зависимости от системы проведения, коэффициенты считаются по-разному
 
     # Пересчитываем коэффициенты
     foreach my $p (@$players){
         my $games=Tournaments::Model::DB->enumeratePlayerGames($p->{id});
 
-        my ($berger)=(0);
+        my ($berger, $buchholtz)=(0, 0);
         foreach my $g (@$games){
             if ($g->{winner}==$p->{id}){
+                $buchholtz+=$PLAYERS->{$g->{loser}}{points};
                 $berger+=$PLAYERS->{$g->{loser}}{points};
+                $p->{opp}{$g->{loser}}=1; # Учет личной встречи для расстановки мест
+            }else{
+                $buchholtz+=$PLAYERS->{$g->{winner}}{points};
+                $p->{opp}{$g->{winner}}=-1;  # Учет личной встречи для расстановки мест
             }
         }
-        $p->{k1}=$berger;
+
+        $p->{k1}=$buchholtz;
+        $p->{k2}=$berger;
     }
 
     # Пересчитываем места в группах
-    $players= [ sort { $a->{groupid}<=>$b->{groupid} or $b->{points} <=> $a->{points} or $b->{k1} <=> $a->{k1} or $b->{rating} <=> $a->{rating} } @$players ];
+    if ($game_type eq 'round-robin'){
+        $players= [ sort { 
+            $a->{groupid}<=>$b->{groupid} or 
+            $b->{points} <=> $a->{points} or 
+            $b->{k2} <=> $a->{k2} or 
+            $b->{opp}{$a->{id}} <=> $a->{opp}{$b->{id}} or 
+            $b->{rating} <=> $a->{rating} 
+        } @$players ];
+    } else {
+        $players= [ sort { 
+            $b->{points} <=> $a->{points} or 
+            $b->{k1} <=> $a->{k1} or 
+            $b->{k2} <=> $a->{k2} or 
+            $b->{rating} <=> $a->{rating} 
+        } @$players ];
+    }
 
     
-    my ($groupid, $place)=(0,0);
+    my ($groupid, $place)=(0,1);
     foreach my $p (@$players){
-        if ($p->{groupid}!=$groupid){
+        # В круговике места в каждой группе свои
+        if ($game_type eq 'round-robin' and $p->{groupid}!=$groupid){ 
             $groupid=$p->{groupid};
-            $place=1;
+            $place=1; 
         }
         $p->{place}=$place;
         $place++;

@@ -14,11 +14,12 @@ use Tournaments::Model::DB;
 use Tournaments::Config;
 
 my $tournament=CNF('game.tournament');
+my $type=CNF('game.type');
 my $tags=CNF('game.tags');
 
 Tournaments::Model::DB->clearPlayers($tournament);
 Tournaments::Model::DB->refreshGames($tags);
 Tournaments::Model::DB->clearLog;
-Tournaments::Model::DB->importPlayers($tournament);
+Tournaments::Model::DB->importPlayers($tournament, $type);
 Tournaments::Controller::Root->update_coefficients;
 
