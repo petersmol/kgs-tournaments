@@ -59,6 +59,8 @@ sub parse_all {
 # Обсчитывает турнирную таблицу по необработанным партиям
 sub process_tournament {
     my ($self, $tags)=@_;
+    my $game_type=CNF('game.type'); # В зависимости от системы проведения, коэффициенты считаются по-разному
+    my $tournament=CNF('game.tournament'); 
 
     # Получаем информацию об игроках
     my $players = Tournaments::Model::DB->getTournamentPlayersByNick;
@@ -73,23 +75,27 @@ sub process_tournament {
         # Пропускаем партии неизвестных игроков 
         next if (!$winner or !$loser);
         
-
-        # Пропускаем игроков из разных групп
-        next if ($winner->{groupid}!=$loser->{groupid});
+        if ($game_type eq 'round-robin'){
+            # Пропускаем игроков из разных групп
+            next if ($winner->{groupid}!=$loser->{groupid});
+        }else{
+            # Пропускаем партии, которых нет в жеребьевке
+            next if (!Tournaments::Model::DB->checkPairing($tournament, $winner->{id}, $loser->{id}));
+        }
 
         # Пропускаем повторно сыгранные партии
         next if (@{Tournaments::Model::DB->enumerateRepeatedGames($winner->{id}, $loser->{id})}>0);
 
         # Пересчитываем очки
 
-        # Победитель получает 2 очка 
-        $winner->{points}+=2;
+        # Победитель получает 1 очкo 
+        $winner->{points}+=1;
 
         $winner->{games_cnt}++;
         $winner->{lastupdate}=\'NOW()';
 
-        # Проигравший получает 1 очко
-        $loser->{points}+=1 if ($game->{win_by} !~/Forfeit/);
+        # Проигравший получает 0.5 фиктивных очка в случае тех.поражения (фиктивные очки учитываются только в коэффициентах соперников)
+        $loser->{fictive_points}+=0.5 if ($game->{win_by} =~/Tech/);
         $loser->{games_cnt}++;
         $loser->{lastupdate}=\'NOW()';
 
@@ -126,12 +132,23 @@ sub update_coefficients {
         my ($berger, $buchholtz)=(0, 0);
         foreach my $g (@$games){
             if ($g->{winner}==$p->{id}){
-                $buchholtz+=$PLAYERS->{$g->{loser}}{points};
-                $berger+=$PLAYERS->{$g->{loser}}{points};
-                $p->{opp}{$g->{loser}}=1; # Учет личной встречи для расстановки мест
+                if ($g->{win_by} eq 'Tech'){
+                    $buchholtz+=$PLAYERS->{$g->{winner}}{points}-1; # очки фиктивного соперника считаем равными очкам игрока (без учета этой технической победы)
+                    $berger+=$PLAYERS->{$g->{winner}}{points}-1;  
+                }else{
+                    $buchholtz+=$PLAYERS->{$g->{loser}}{points}+$PLAYERS->{$g->{loser}}{fictive_points};
+                    $berger+=$PLAYERS->{$g->{loser}}{points}+$PLAYERS->{$g->{loser}}{fictive_points};
+                    $p->{opp}{$g->{loser}}=1; # Учет личной встречи для расстановки мест
+                }
             }else{
-                $buchholtz+=$PLAYERS->{$g->{winner}}{points};
-                $p->{opp}{$g->{winner}}=-1;  # Учет личной встречи для расстановки мест
+                if ($g->{win_by} eq 'Tech'){
+                    # Если партия проиграна у фиктивного соперника, получаем прибавку к бухгольцу, как будто у соперника столько же очков, сколько у нас
+                    $buchholtz+=$PLAYERS->{$g->{loser}}{points};
+                }else{
+                    # Иначе - прибавляем к Бухгольцу фактические очки соперника
+                    $buchholtz+=$PLAYERS->{$g->{winner}}{points}+$PLAYERS->{$g->{winner}}{fictive_points};
+                    $p->{opp}{$g->{winner}}=-1;  # Учет личной встречи для расстановки мест
+                }
             }
         }
 

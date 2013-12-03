@@ -27,12 +27,21 @@ BEGIN {
 sub getTournamentPlayersByNick {
     my ($self)=@_; 
     
-    my $rows=$dbh->selectall_hashref("SELECT * FROM tournamentPlayers WHERE active=1 ORDER BY kgs", 'kgs');
+    my $rows=$dbh->selectall_hashref("SELECT * FROM tournamentPlayers WHERE active=1 or id=1 ORDER BY kgs", 'kgs');
     return $rows;
 }
 
+sub findPlayerByName {
+    my ($self, $fio)=@_; 
+    
+    my $sth=$dbh->prepare("SELECT id, kgs FROM tournamentPlayers WHERE active=1 AND fio=? LIMIT 1");
+    $sth->execute($fio);
+    my $rows = $sth->fetchrow_hashref();
+    return ($rows->{id}, $rows->{kgs}) if ($rows->{id});
+}
+
 sub getTournamentPlayers {
-    my ($self)=@_; 
+    my ($self)=@_;
     
     my $rows=$dbh->selectall_arrayref("SELECT * FROM tournamentPlayers WHERE active=1", AS_HASH);
     return $rows;
@@ -42,6 +51,7 @@ sub getTournamentPlayers {
 sub clearPlayers {
     my ($self, $tournament)=@_; 
     $dbh->do("DELETE FROM tournamentPlayers WHERE tournament='$tournament'");
+    $dbh->do("DELETE FROM tournamentPairing WHERE tournament='$tournament'");
 #    $dbh->do("DELETE FROM tournamentChat");
 #    $dbh->do("DELETE FROM tournamentAnnounce");
     $dbh->do("UPDATE tournamentPlayers SET active=0");
@@ -51,16 +61,16 @@ sub clearPlayers {
 sub importPlayers {
     my ($self, $tournament, $type)=@_; 
     my $rows=$dbh->selectall_arrayref("SELECT * FROM tournamentReg WHERE tournament='$tournament'", AS_HASH );
-    my $groups=4; # Group counts
-    my $players_in_group=int(@$rows/$groups +0.99);
-#    my $players_in_group=10;
+    my $groups=3; # Group counts
+#    my $players_in_group=int(@$rows/$groups +0.99);
+    my $players_in_group=16;
 
     # Sort players by rating
     $rows = [ reverse sort {$a->{rating} <=> $b->{rating}} @$rows ];
     
 
-    my $sth=$dbh->prepare("INSERT INTO tournamentPlayers (tournament, kgs, fio, rating, groupid, init_place, points, games_cnt, lastupdate, active) 
-                                          VALUES ('$tournament'      , ?  , ?  , ?  , ?      , ?            , ?     , 0        , NOW()     , 1     )");
+    my $sth=$dbh->prepare("INSERT INTO tournamentPlayers (tournament, kgs, fio, rating, groupid, init_place, points, fictive_points, games_cnt, lastupdate, active) 
+                                          VALUES ('$tournament'      , ?  , ?  , ?  , ?      , ?            , ?    , 0             , 0        , NOW()     , 1     )");
 
 
     my ($cur_group,$cur_place, $cur_place_in_group)=(1,1,1);
@@ -100,15 +110,15 @@ sub importPlayers {
 sub updatePlayers {
     my ($self, $players)=@_; 
 
-    my $sth=$dbh->prepare("UPDATE tournamentPlayers SET place=?, points=?, k1=?, k2=?, games_cnt=?, lastupdate=? WHERE kgs=? AND active=1");
+    my $sth=$dbh->prepare("UPDATE tournamentPlayers SET place=?, points=?, fictive_points=?, k1=?, k2=?, games_cnt=?, lastupdate=? WHERE kgs=? AND active=1");
 
     if (ref $players eq 'HASH'){
         foreach my $name (keys %$players){
-            $sth->execute($players->{$name}{place}, $players->{$name}{points}, $players->{$name}{k1}, $players->{$name}{k2}, $players->{$name}{games_cnt}, $players->{$name}{lastupdate}, $name);
+            $sth->execute($players->{$name}{place}, $players->{$name}{points}, $players->{$name}{fictive_points}, $players->{$name}{k1}, $players->{$name}{k2}, $players->{$name}{games_cnt}, $players->{$name}{lastupdate}, $name);
         }
     }else{
         foreach my $p (@$players){
-            $sth->execute($p->{place}, $p->{points}, $p->{k1}, $p->{k2}, $p->{games_cnt}, $p->{lastupdate}, $p->{kgs});
+            $sth->execute($p->{place}, $p->{points}, $p->{fictive_points}, $p->{k1}, $p->{k2}, $p->{games_cnt}, $p->{lastupdate}, $p->{kgs});
         }
     }
 
@@ -169,7 +179,7 @@ sub insertTournamentGame {
 
 sub enumeratePlayerGames {
     my ($self, $id)=@_;
-    $dbh->selectall_arrayref("SELECT * FROM tournamentGames WHERE winner='$id' OR loser='$id'", AS_HASH);
+    $dbh->selectall_arrayref("SELECT t.*, g.win_by FROM tournamentGames t JOIN KGS_games g ON t.game_id=g.id WHERE t.winner='$id' OR t.loser='$id'", AS_HASH);
 }
 
 
@@ -195,6 +205,34 @@ sub clearLog {
 sub writeLog {
     my ($self, $name, $descr, $game_id)=@_; 
     $dbh->do("INSERT INTO tournamentLog (name, descr, game_id) VALUES ('$name', '$descr', '$game_id')");
+}
+
+################################
+###          Pairing        ####
+################################
+
+sub getPairing {
+    my ($self, $tournament, $round)=@_; 
+    my $rows=$dbh->selectall_arrayref("SELECT * FROM tournamentPairing WHERE tournament='$tournament' AND round='$round'", AS_HASH);
+
+    return $rows;
+}
+
+sub clearPairing {
+    my ($self, $tournament, $round)=@_; 
+    $dbh->do("DELETE FROM tournamentPairing WHERE tournament='$tournament' AND round='$round'");
+}
+
+sub setPairing {
+    my ($self, $tournament, $round, $player1, $player2)=@_; 
+    $dbh->do("INSERT INTO tournamentPairing (tournament, round, player1, player2) VALUES ('$tournament', $round, $player1, $player2)");
+}
+
+sub checkPairing {
+    my ($self, $tournament, $player1, $player2)=@_; 
+    return if (!$player1 or !$player2);
+    my $rows=$dbh->selectall_arrayref("SELECT * FROM tournamentPairing WHERE tournament='$tournament' AND player1 IN ('$player1', '$player2') AND player2 IN ('$player1', '$player2')", AS_HASH);
+    return $rows->[0]{round} if $rows;
 }
 
 1;
